@@ -6,3 +6,5 @@ pub mod http;
 pub mod iam;
 pub mod sign;
 pub mod acl;
+pub mod notification;
+pub mod channel;

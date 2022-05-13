@@ -10,7 +10,9 @@ use google_cloud_auth::credentials::CredentialsFile;
 use std::collections::HashMap;
 use tokio_util::sync::CancellationToken;
 use crate::acl::{BucketACLHandle, DefaultObjectACLHandle};
+use crate::channel::ChannelHandle;
 use crate::http::entity::list_channels_response::Items;
+use crate::notification::NotificationHandle;
 
 pub struct BucketHandle<'a> {
     name: String,
@@ -94,6 +96,26 @@ impl<'a> BucketHandle<'a> {
         BucketACLHandle::new(self.name.as_str(), entity, &self.storage_client)
     }
 
+    pub async fn get_notification(&self, id: &str, cancel: Option<CancellationToken>) -> Result<NotificationHandle, Error> {
+        self.storage_client.get_notification(self.name.as_str(), id, cancel).await.map(|x| {
+           NotificationHandle::new(&self.name, &self.storage_client, x)
+        })
+    }
+
+    pub async fn create_notification(&self, config: &NotificationCreationConfig, cancel: Option<CancellationToken>) -> Result<NotificationHandle, Error> {
+        self.storage_client.insert_notification(self.name.as_str(), config, cancel).await.map(|x| {
+            NotificationHandle::new(&self.name, &self.storage_client, x)
+        })
+    }
+
+    pub async fn notifications(&self, cancel: Option<CancellationToken>) -> Result<Vec<NotificationHandle>, Error> {
+        self.storage_client.list_notifications(self.name.as_str(), cancel).await.map(|x| {
+            x.into_iter().map(|y| {
+                NotificationHandle::new(&self.name, &self.storage_client, y)
+            }).collect()
+        })
+    }
+
     pub fn default_object_acl<'b>(&self, entity: &'b str) -> DefaultObjectACLHandle<'_, 'b> {
         DefaultObjectACLHandle::new(self.name.as_str(), entity, &self.storage_client)
     }
@@ -102,29 +124,14 @@ impl<'a> BucketHandle<'a> {
         self.storage_client.list_bucket_acls(self.name.as_str(), cancel).await
     }
 
-    pub async fn notifications(&self, cancel: Option<CancellationToken>) -> Result<Vec<Notification>, Error> {
-        self.storage_client.list_notifications(self.name.as_str(), cancel).await
+    pub async fn channels(&self, cancel: Option<CancellationToken>) -> Result<Vec<ChannelHandle>, Error> {
+        self.storage_client.list_channels(self.name.as_str(), cancel).await.map(|x| {
+            x.into_iter().map(|y| {
+                ChannelHandle::new(&self.name, &self.storage_client, y)
+            }).collect()
+        })
     }
 
-    pub async fn get_notification(&self, id: &str, cancel: Option<CancellationToken>) -> Result<Notification, Error> {
-        self.storage_client.get_notification(self.name.as_str(), id, cancel).await
-    }
-
-    pub async fn delete_notification(&self, id: &str, cancel: Option<CancellationToken>) -> Result<Notification, Error> {
-        self.storage_client.get_notification(self.name.as_str(), id, cancel).await
-    }
-
-    pub async fn create_notification(&self, config: &NotificationCreationConfig, cancel: Option<CancellationToken>) -> Result<Notification, Error> {
-        self.storage_client.insert_notification(self.name.as_str(), config, cancel).await
-    }
-
-    pub async fn channels(&self, cancel: Option<CancellationToken>) -> Result<Vec<Items>, Error> {
-        self.storage_client.list_channels(self.name.as_str(), cancel).await
-    }
-
-    pub async fn stop_channel(&self, channel: &Items, cancel: Option<CancellationToken>) -> Result<(), Error> {
-        self.storage_client.stop_channel(channel, cancel).await
-    }
 }
 
 
